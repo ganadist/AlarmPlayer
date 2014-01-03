@@ -1,4 +1,5 @@
 import datetime
+import weakref
 from eloop import Timer, main
 
 def delta_to_ms(td):
@@ -32,8 +33,16 @@ class BaseScheduler:
         schedule_datetime = datetime.datetime.combine(self.date, self.time)
         now = datetime.datetime.now()
         delta = schedule_datetime - now
-        self.tag = Timer(delta_to_ms(delta), self.run_callback)
+        print 'register schedule for', self.date, self.time
+        def wrapper(ref):
+            schedule = ref()
+            if schedule:
+                schedule.run_callback()
+        self.tag = Timer(delta_to_ms(delta), wrapper, weakref.ref(self))
 
+    def __del__(self):
+        print 'unregister schedule for', self.date, self.time
+        self.tag = None
 
 class WeeklyScheduler(BaseScheduler):
     def __init__(self, weekday, time, cb, *args):
