@@ -17,40 +17,61 @@ class AlarmPlayer:
 
 class ScheduleFetcher:
     def __init__(self):
-        self.schedule_file = os.path.join(config.CACHE_DIR, 'schedule.json')
-        self.fetcher = Fetcher(config.URL, self.schedule_file)
+        self.timetable_file = os.path.join(config.CACHE_DIR, 'timetable.json')
+        self.soundlist_file = os.path.join(config.CACHE_DIR, 'soundlist.json')
+        self.timetable_fetcher = Fetcher(config.TIMETABLE_URL, self.timetable_file)
+        self.sound_fetcher = Fetcher(config.SOUND_URL, self.soundlist_file)
         self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
 
         self.schedule_alarm = []
         self.schedule_fetch = []
-        if 1 or not os.access(self.schedule_file, os.R_OK):
+        if 1 or not os.access(self.timetable_file, os.R_OK):
             self.fetch()
 
     def fetch(self):
-        self.fetcher.run(self.parse_schedule)
+        self.timetable_fetcher.run(self.parse_timetable)
 
-    def parse_schedule(self, success, fetcher):
+    def parse_timetable(self, success, fetcher):
         if not success:
-            print 'fetch schedule.json failed'
+            print 'fetch timetable.json failed'
             return
         try:
-            schedule = json.load(open(fetcher.outname))
+            timetable = json.load(open(fetcher.outname))
         except ValueError:
             print 'invalid json schedule file'
             return
         schedule_alarm = []
-        schedule_fetch = []
-        for item in schedule.get('items'):
-            time = [int(x) for x in item.get('scheduled').split(':')]
-            time = datetime.time(*time)
-            url = str(item.get('url'))
-            outname = os.path.join(config.CACHE_DIR, os.path.basename(url))
+        for item in timetable.get('timetable'):
+            time = hms2time(item.get('time'))
+            outname = str(item.get('no')) + '.ogg'
+            outname = os.path.join(config.CACHE_DIR, outname)
+            weekday = int(item.get('weekday'))
             alarm = AlarmPlayer(outname)
-
-            schedule_alarm.append(DailyScheduler(time, alarm.run))
-            schedule_fetch.append(Fetcher(url, outname))
+            schedule_alarm.append(WeeklyScheduler(weekday, time, alarm.run))
 
         self.schedule_alarm = schedule_alarm
+
+        self.sound_fetcher.run(self.parse_soundlist)
+
+    def parse_soundlist(self, success, fetcher):
+        if not success:
+            print 'fetch soundlist.json failed'
+            return
+
+        try:
+            soundlist = json.load(open(fetcher.outname))
+        except ValueError:
+            print 'invalid json soundlist file'
+            return
+
+        URL_BASE = os.path.dirname(fetcher.url)
+        schedule_fetch = []
+        for item in soundlist.get('list'):
+            outname = str(item.get('no')) + '.ogg'
+            outname = os.path.join(config.CACHE_DIR, outname)
+            url = '/'.join((URL_BASE, str(item.get('path'))))
+            schedule_fetch.append(Fetcher(url, outname))
+
         self.schedule_fetch = schedule_fetch
 
         def cb(success, fetcher):
