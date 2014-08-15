@@ -1,20 +1,22 @@
 import datetime
 import json
 import os
+from lib import hms2time
 
 CONFIG_FILE = 'config.json'
 FETCH_TIME = None
 CACHE_DIR = 'cache'
-URL = ''
+TIMETABLE_URL = ''
+SOUND_URL = ''
 DEFAULT_ALARM = ''
 
 
 def load():
-    global URL, FETCH_TIME, CACHE_DIR
+    global TIMETABLE_URL, SOUND_URL, FETCH_TIME, CACHE_DIR
     config = json.load(open(CONFIG_FILE))
-    URL = str(config.get('url'))
-    time = [int(x) for x in config.get('time').split(':')]
-    FETCH_TIME = datetime.time(*time)
+    TIMETABLE_URL = str(config.get('timetable_url'))
+    SOUND_URL = str(config.get('sound_url'))
+    FETCH_TIME = hms2time(config.get('time'))
     CACHE_DIR = str(config.get('cachedir'))
     try:
         os.makedirs(CACHE_DIR)

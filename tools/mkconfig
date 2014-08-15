@@ -1,8 +1,11 @@
 #!/usr/bin/env python2
 import json
 
-c = {'url': 'http://localhost:8080/work/schedule.json',
- 'time': '04:10:00',
- 'cachedir': 'cache'}
+c = {
+  'timetable_url': 'http://javaoracle.cafe24.com/timetable.php',
+  'sound_url': 'http://javaoracle.cafe24.com/playlist.php',
+  'time': '041000',
+  'cachedir': 'cache'
+}
 
 print json.dumps(c)
