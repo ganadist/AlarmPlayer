@@ -1,0 +1,12 @@
+#!/bin/sh
+echo "installing sox for ogg play"
+which play > /dev/null || apt-get install sox
+
+echo "setup timezone to KST"
+cp -f /usr/share/zoneinfo/ROK /etc/localtime
+
+echo "generate config.json for test"
+./tools/mkconfig > config.json
+
+echo "generate and install schedule.json for test"
+./tools/mkschedule > /var/www/work/schedule.json

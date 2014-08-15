@@ -1,0 +1,8 @@
+#!/usr/bin/env python2
+import json
+
+c = {'url': 'http://localhost:8080/work/schedule.json',
+ 'time': '04:10:00',
+ 'cachedir': 'cache'}
+
+print json.dumps(c)

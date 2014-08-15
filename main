@@ -1,0 +1,76 @@
+#!/usr/bin/env python2
+
+import os
+import json
+import datetime
+from lib import *
+import config
+
+class AlarmPlayer:
+    def __init__(self, filename):
+        self.filename = filename
+        if not os.access(filename, os.R_OK):
+            self.filename = config.DEFAULT_ALARM
+
+    def run(self):
+        self.player = Player(self.filename)
+
+class ScheduleFetcher:
+    def __init__(self):
+        self.schedule_file = os.path.join(config.CACHE_DIR, 'schedule.json')
+        self.fetcher = Fetcher(config.URL, self.schedule_file)
+        self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
+
+        self.schedule_alarm = []
+        self.schedule_fetch = []
+        if 1 or not os.access(self.schedule_file, os.R_OK):
+            self.fetch()
+
+    def fetch(self):
+        self.fetcher.run(self.parse_schedule)
+
+    def parse_schedule(self, success, fetcher):
+        if not success:
+            print 'fetch schedule.json failed'
+            return
+        try:
+            schedule = json.load(open(fetcher.outname))
+        except ValueError:
+            print 'invalid json schedule file'
+            return
+        schedule_alarm = []
+        schedule_fetch = []
+        for item in schedule.get('items'):
+            time = [int(x) for x in item.get('scheduled').split(':')]
+            time = datetime.time(*time)
+            url = str(item.get('url'))
+            outname = os.path.join(config.CACHE_DIR, os.path.basename(url))
+            alarm = AlarmPlayer(outname)
+
+            schedule_alarm.append(DailyScheduler(time, alarm.run))
+            schedule_fetch.append(Fetcher(url, outname))
+
+        self.schedule_alarm = schedule_alarm
+        self.schedule_fetch = schedule_fetch
+
+        def cb(success, fetcher):
+            self.schedule_fetch.pop(0)
+            if not success:
+                self.schedule_fetch.append(fetcher)
+
+            if not self.schedule_fetch:
+                return
+
+            item = self.schedule_fetch[0]
+            item.run(cb)
+
+        if self.schedule_fetch:
+            self.schedule_fetch[0].run(cb)
+
+def load_config():
+    config.load()
+
+if __name__ == '__main__':
+    load_config()
+    f = ScheduleFetcher()
+    main()
