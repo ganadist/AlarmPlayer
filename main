@@ -99,7 +99,7 @@ class ScheduleFetcher:
         schedule_alarm = []
         for item in timetable.get('timetable'):
             time = hms2time(item.get('time'))
-            outname = str(item.get('no')) + '.ogg'
+            outname = str(item.get('sound_no')) + '.ogg'
             outname = os.path.join(config.CACHE_DIR, outname)
             weekday = int(item.get('weekday'))
             alarm = AlarmPlayer(outname)
