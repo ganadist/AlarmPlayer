@@ -9,8 +9,7 @@ class Fetcher:
         self.proc = None
 
     def run(self, complete_cb = None, *args):
-        if self.proc:
-            raise RuntimeError
+        self.proc = None
 
         self.complete_cb = complete_cb
         self.cb_args = args
@@ -24,6 +23,7 @@ class Fetcher:
 
     def watch(self, pid, status):
         success = status == 0
+        self.proc = None
         if success:
             try:
                 if os.access(self.outname, os.R_OK):
@@ -37,7 +37,6 @@ class Fetcher:
 
         if self.complete_cb:
             self.complete_cb(success, self, *self.cb_args)
-        self.proc = None
 
     def __del__(self):
         self.clean_tmp()
