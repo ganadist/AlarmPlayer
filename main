@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import glob
 import os
 import json
 import datetime
@@ -15,7 +16,48 @@ class AlarmPlayer:
     def run(self):
         self.player = Player(self.filename)
 
+class DownloadManager:
+    def __init__(self):
+        self.fetch_list = []
+
+    def add(self, url, outname):
+        self.fetch_list.append(Fetcher(url, outname))
+
+    def run(self):
+        self.cleanup()
+        if not self.fetch_list:
+            return
+
+        fetcher = self.fetch_list[0]
+        fetcher.run(self.next)
+
+    def cleanup(self):
+        old_files = glob.glob(os.path.join(config.CONFIG_FILE + '*.ogg'))
+        new_files = [f.outname for f in self.fetch_list]
+        for f in set(old_files) - set(new_files):
+            try:
+                os.unlink(f)
+            except OSError, e:
+                print e
+
+        fetch_list = []
+        for f in self.fetch_list:
+            if not os.access(f.outname, os.R_OK):
+                fetch_list.append(f)
+        self.fetch_list = fetch_list
+
+    def next(self, success, fetcher):
+        self.fetch_list.pop(0)
+        if not success:
+            self.fetch_list.append(fetcher)
+
+        if not self.fetch_list:
+            return
+
+        self.run()
+
 class ScheduleFetcher:
+    RETRY_DELAY = 10 * 60 * 1000
     def __init__(self):
         self.timetable_file = os.path.join(config.CACHE_DIR, 'timetable.json')
         self.soundlist_file = os.path.join(config.CACHE_DIR, 'soundlist.json')
@@ -24,21 +66,33 @@ class ScheduleFetcher:
         self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
 
         self.schedule_alarm = []
-        self.schedule_fetch = []
+        self.downloader = DownloadManager()
         if 1 or not os.access(self.timetable_file, os.R_OK):
             self.fetch()
+        else:
+            self.parse_timetable(True, self.timetable_fetcher)
 
     def fetch(self):
         self.timetable_fetcher.run(self.parse_timetable)
 
+    def retry_fetch_timetable(self):
+        self.schedule = Timer(RETRY_DELAY,
+                self.timetable_fetcher.run, self.parse_timetable)
+
+    def retry_fetch_soundlist(self):
+        self.sound_tag = Timer(RETRY_DELAY,
+                self.sound_fetcher.run, self.parse_soundlist)
+
     def parse_timetable(self, success, fetcher):
         if not success:
             print 'fetch timetable.json failed'
+            self.retry_fetch_timetable()
             return
         try:
             timetable = json.load(open(fetcher.outname))
-        except ValueError:
-            print 'invalid json schedule file'
+        except ValueError, e:
+            print 'invalid json timetable file', e
+            self.retry_fetch_timetable()
             return
         schedule_alarm = []
         for item in timetable.get('timetable'):
@@ -50,43 +104,31 @@ class ScheduleFetcher:
             schedule_alarm.append(WeeklyScheduler(weekday, time, alarm.run))
 
         self.schedule_alarm = schedule_alarm
-
         self.sound_fetcher.run(self.parse_soundlist)
+
+        self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
 
     def parse_soundlist(self, success, fetcher):
         if not success:
             print 'fetch soundlist.json failed'
+            self.retry_fetch_soundlist()
             return
 
         try:
             soundlist = json.load(open(fetcher.outname))
-        except ValueError:
-            print 'invalid json soundlist file'
+        except ValueError, e:
+            print 'invalid json soundlist file', e
+            self.retry_fetch_soundlist()
             return
 
         URL_BASE = os.path.dirname(fetcher.url)
-        schedule_fetch = []
         for item in soundlist.get('list'):
             outname = str(item.get('no')) + '.ogg'
             outname = os.path.join(config.CACHE_DIR, outname)
             url = '/'.join((URL_BASE, str(item.get('path'))))
-            schedule_fetch.append(Fetcher(url, outname))
+            self.downloader.add(url, outname)
 
-        self.schedule_fetch = schedule_fetch
-
-        def cb(success, fetcher):
-            self.schedule_fetch.pop(0)
-            if not success:
-                self.schedule_fetch.append(fetcher)
-
-            if not self.schedule_fetch:
-                return
-
-            item = self.schedule_fetch[0]
-            item.run(cb)
-
-        if self.schedule_fetch:
-            self.schedule_fetch[0].run(cb)
+        self.downloader.run()
 
 def load_config():
     config.load()
