@@ -10,11 +10,13 @@ import config
 class AlarmPlayer:
     def __init__(self, filename):
         self.filename = filename
-        if not os.access(filename, os.R_OK):
-            self.filename = config.DEFAULT_ALARM
 
     def run(self):
-        self.player = Player(self.filename)
+        filename = self.filename
+        if not os.access(filename, os.R_OK):
+            filename = config.DEFAULT_ALARM
+
+        self.player = Player(filename)
 
 class DownloadManager:
     def __init__(self):
