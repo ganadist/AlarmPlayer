@@ -1,29 +1,63 @@
 #!/bin/sh
-echo "installing sox for ogg play"
-which play > /dev/null || apt-get install sox
 
-echo "setup timezone to KST"
-cp -f /usr/share/zoneinfo/ROK /etc/localtime
+REPO_NAME=AlarmPlayer
+SERVICE_NAME=chime-player.service
+DEFAULT_TARGET=multi-user.target
 
-echo "generate config.json for test"
-./tools/mkconfig > config.json
+install_service() {
+  git clone https://github.com/ganadist/${REPO_NAME}
 
-echo "generate and install schedule.json for test"
-./tools/mkschedule > /var/www/work/schedule.json
+  echo "generate config.json for test"
+  ${REPO_NAME}/tools/mkconfig > ${REPO_NAME}/config.json
 
-INIT_D_ENABLE=""
-INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
+  echo "register service on systemd"
+  cat > /etc/systemd/system/${SERVICE_NAME} <<EOF
+[Unit]
+Description=Daemon for Chime Service
 
-for S in $INIT_D_ENABLE
-do
- echo "enable $S"
- update-rc.d "$S" defaults
- /etc/init.d/$S start
-done
+[Service]
+ExecStart=${PWD}/${REPO_NAME}/main
+Restart=always
+RestartSec=2
 
-for S in $INIT_D_DISABLE
-do
- echo "disable $S"
- update-rc.d -f "$S" remove
- /etc/init.d/$S stop
-done
+[Install]
+WantedBy=${DEFAULT_TARGET}
+
+EOF
+
+  systemctl --system daemon-reload
+  systemctl enable ${SERVICE_NAME}
+
+  echo "change target to ${DEFAULT_TARGET}"
+  systemctl enable ${DEFAULT_TARGET}
+}
+
+prepare_service() {
+  echo "installing sox for ogg play"
+  which play > /dev/null || apt-get install sox
+
+  echo "setup timezone to KST"
+  cp -f /usr/share/zoneinfo/ROK /etc/localtime
+
+  INIT_D_ENABLE=""
+  INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
+
+  for S in $INIT_D_ENABLE
+  do
+   echo "enable $S"
+   update-rc.d "$S" defaults
+   /etc/init.d/$S start
+  done
+
+  for S in $INIT_D_DISABLE
+  do
+   echo "disable $S"
+   update-rc.d -f "$S" remove
+   /etc/init.d/$S stop
+  done
+}
+
+install_service
+prepare_service
+
+systemctl start ${SERVICE_NAME}
