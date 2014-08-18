@@ -1,0 +1,8 @@
+#!/bin/sh
+
+SERVICE_NAME=chime-player.service
+systemctl stop chime-player.service
+systemctl disable chime-player.service
+rm -f /etc/systemd/system/chime-player.service
+systemctl --system daemon-reload
+
