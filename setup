@@ -10,3 +10,20 @@ echo "generate config.json for test"
 
 echo "generate and install schedule.json for test"
 ./tools/mkschedule > /var/www/work/schedule.json
+
+INIT_D_ENABLE=""
+INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
+
+for S in $INIT_D_ENABLE
+do
+ echo "enable $S"
+ update-rc.d "$S" defaults
+ /etc/init.d/$S start
+done
+
+for S in $INIT_D_DISABLE
+do
+ echo "disable $S"
+ update-rc.d -f "$S" remove
+ /etc/init.d/$S stop
+done
