@@ -3,12 +3,17 @@
 REPO_NAME=AlarmPlayer
 SERVICE_NAME=chime-player.service
 DEFAULT_TARGET=multi-user.target
+USER=nobody
+GROUP=nogroup
 
 install_service() {
   git clone https://github.com/ganadist/${REPO_NAME}
 
   echo "generate config.json for test"
   ${REPO_NAME}/tools/mkconfig > ${REPO_NAME}/config.json
+
+  chmod o+x .
+  chown ${USER}:${GROUP} -R ${REPO_NAME}
 
   echo "register service on systemd"
   cat > /etc/systemd/system/${SERVICE_NAME} <<EOF
@@ -19,6 +24,8 @@ Description=Daemon for Chime Service
 ExecStart=${PWD}/${REPO_NAME}/main
 Restart=always
 RestartSec=2
+User=${USER}
+Group=${GROUP}
 
 [Install]
 WantedBy=${DEFAULT_TARGET}
