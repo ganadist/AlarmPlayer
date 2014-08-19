@@ -4,6 +4,7 @@ import glob
 import os, sys
 import json
 import datetime
+import time
 from lib import *
 import config
 
@@ -17,6 +18,24 @@ class AlarmPlayer:
             filename = config.DEFAULT_ALARM
 
         self.player = Player(filename)
+
+class TimeSyncManager:
+    def __init__(self, cb, *args):
+        self.time = time.time()
+        self.tag = Timer(10 * 1000, self.check_time)
+        self.cb = cb
+        self.cb_args = args
+
+    def check_time(self):
+        ctime = time.time()
+        if abs(self.time - ctime) > 20:
+            print 'clock was changed, run time sync callback'
+            try:
+              self.cb(*self.cb_args)
+            except:
+              pass
+        self.time = ctime
+        return True
 
 class DownloadManager:
     def __init__(self):
@@ -58,79 +77,97 @@ class DownloadManager:
 
         self.run()
 
-class ScheduleFetcher:
+class FetcherService:
     RETRY_DELAY = 10 * 60 * 1000
-    def __init__(self):
-        self.timetable_file = os.path.join(config.CACHE_DIR, 'timetable.json')
-        self.soundlist_file = os.path.join(config.CACHE_DIR, 'soundlist.json')
-        self.timetable_fetcher = Fetcher(config.TIMETABLE_URL, self.timetable_file)
-        self.sound_fetcher = Fetcher(config.SOUND_URL, self.soundlist_file)
+    def __init__(self, url, filename):
+        self.filename = os.path.join(config.CACHE_DIR, filename)
+        self.url = url
+        self.fetcher = Fetcher(url, self.filename)
         self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
 
-        self.schedule_alarm = []
-        self.downloader = DownloadManager()
-        if 1 or not os.access(self.timetable_file, os.R_OK):
+        if 1 or not os.access(self.filename, os.R_OK):
             self.fetch()
         else:
-            self.parse_timetable(True, self.timetable_fetcher)
+            self.parse()
 
     def fetch(self):
-        self.timetable_fetcher.run(self.parse_timetable)
+        self.fetcher.run(self.fetch_completed)
 
-    def retry_fetch_timetable(self):
-        self.schedule = Timer(self.RETRY_DELAY,
-                self.timetable_fetcher.run, self.parse_timetable)
+    def retry(self):
+        self.schedule = Timer(self.RETRY_DELAY, self.fetch)
 
-    def retry_fetch_soundlist(self):
-        self.sound_tag = Timer(self.RETRY_DELAY,
-                self.sound_fetcher.run, self.parse_soundlist)
+    def clock_changed(self):
+        if not os.access(self.filename, os.R_OK):
+            if not self.fetcher.is_running():
+                self.retry()
+            print '%s is not fetched yet.'%self.filename
+            return
+        self.parse()
 
-    def parse_timetable(self, success, fetcher):
+    def fetch_completed(self, success, fetcher):
         if not success:
-            print 'fetch timetable.json failed'
-            self.retry_fetch_timetable()
+            print 'fetch %s failed'%self.filename
+            self.retry()
             return
+
         try:
-            timetable = json.load(open(fetcher.outname))
-        except ValueError, e:
-            print 'invalid json timetable file', e
-            self.retry_fetch_timetable()
-            return
+            self.parse()
+        except Exception as e:
+            print 'parse error', e
+            self.retry()
+        else:
+            self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
+
+    def parse(self):
+        raise NotImplementedError
+
+def get_filename(key):
+    outname = str(key) + '.ogg'
+    return os.path.join(config.CACHE_DIR, outname)
+
+class TimetableFetcherService(FetcherService):
+    def __init__(self):
+        FetcherService.__init__(self, config.TIMETABLE_URL, 'timetable.json') 
+
+    def parse(self):
+        timetable = json.load(open(self.filename))
+
         schedule_alarm = []
         for item in timetable.get('timetable'):
             time = hms2time(item.get('time'))
-            outname = str(item.get('sound_no')) + '.ogg'
-            outname = os.path.join(config.CACHE_DIR, outname)
+            outname = get_filename(item.get('sound_no'))
             weekday = int(item.get('weekday'))
             alarm = AlarmPlayer(outname)
             schedule_alarm.append(WeeklyScheduler(weekday, time, alarm.run))
 
         self.schedule_alarm = schedule_alarm
-        self.sound_fetcher.run(self.parse_soundlist)
 
-        self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
+class SoundlistFetcherService(FetcherService):
+    def __init__(self):
+        self.downloader = DownloadManager()
+        FetcherService.__init__(self, config.SOUND_URL, 'soundlist.json') 
 
-    def parse_soundlist(self, success, fetcher):
-        if not success:
-            print 'fetch soundlist.json failed'
-            self.retry_fetch_soundlist()
-            return
+    def parse(self):
+        soundlist = json.load(open(self.filename))
 
-        try:
-            soundlist = json.load(open(fetcher.outname))
-        except ValueError, e:
-            print 'invalid json soundlist file', e
-            self.retry_fetch_soundlist()
-            return
-
-        URL_BASE = os.path.dirname(fetcher.url)
+        URL_BASE = os.path.dirname(self.url)
         for item in soundlist.get('list'):
-            outname = str(item.get('no')) + '.ogg'
-            outname = os.path.join(config.CACHE_DIR, outname)
+            outname = get_filename(item.get('no'))
             url = '/'.join((URL_BASE, str(item.get('path'))))
             self.downloader.add(url, outname)
 
         self.downloader.run()
+
+ 
+class ScheduleFetcher:
+    def __init__(self):
+        self.timetable = TimetableFetcherService()
+        self.soundlist = SoundlistFetcherService()
+        self.timesync = TimeSyncManager(self.reschedule)
+
+    def reschedule(self):
+        self.timetable.clock_changed()
+        self.soundlist.clock_changed()
 
 def load_config():
     config.load()
