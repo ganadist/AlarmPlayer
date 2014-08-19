@@ -78,11 +78,11 @@ class ScheduleFetcher:
         self.timetable_fetcher.run(self.parse_timetable)
 
     def retry_fetch_timetable(self):
-        self.schedule = Timer(RETRY_DELAY,
+        self.schedule = Timer(self.RETRY_DELAY,
                 self.timetable_fetcher.run, self.parse_timetable)
 
     def retry_fetch_soundlist(self):
-        self.sound_tag = Timer(RETRY_DELAY,
+        self.sound_tag = Timer(self.RETRY_DELAY,
                 self.sound_fetcher.run, self.parse_soundlist)
 
     def parse_timetable(self, success, fetcher):
