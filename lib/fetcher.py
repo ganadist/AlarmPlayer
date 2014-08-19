@@ -17,6 +17,9 @@ class Fetcher:
         cmd = 'curl', '-o', self.tmpname, self.url
         self.proc = Spawn(cmd, self.watch)
 
+    def is_running(self):
+        return self.proc != None
+
     def clean_tmp(self):
         if os.access(self.tmpname, os.R_OK):
             os.unlink(self.tmpname)
