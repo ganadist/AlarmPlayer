@@ -1,5 +1,6 @@
 import os
 from eloop import Spawn, main
+from log import Logger
 
 class Fetcher:
     def __init__(self, url, outname):
@@ -46,9 +47,10 @@ class Fetcher:
         self.proc = None
 
 if __name__ == '__main__':
+    Log = Logger('fetcher')
     url = 'https://android.googlesource.com/mirror/manifest/+/master/default.xml'
     def cb(success, fetcher, *args):
-        print 'success =', success, 'filename =', fetcher.outname, 'args =', args
+        Log.i('success = %s, filename = %s, args = %s'%(success, fetcher.outname, args))
 
     f = Fetcher(url, 'manifest.xml')
     f.run(cb, 'fetch test', 1, 2, 3)
