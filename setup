@@ -46,6 +46,12 @@ prepare_service() {
   echo "setup timezone to KST"
   cp -f /usr/share/zoneinfo/ROK /etc/localtime
 
+  echo "add privilege to run ntpdate for timesync"
+  cat > /etc/sudoers.d/chime_player << EOF
+ALL ALL = NOPASSWD: /usr/sbin/ntpdate-debian
+EOF
+  chmod 440 /etc/sudoers.d/chime_player
+
   INIT_D_ENABLE=""
   INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
 
