@@ -51,6 +51,7 @@ prepare_service() {
 ALL ALL = NOPASSWD: /usr/sbin/ntpdate-debian
 EOF
   chmod 440 /etc/sudoers.d/chime_player
+  ln -sf /usr/sbin/ntpdate-debian /etc/cron.daily/
 
   INIT_D_ENABLE=""
   INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
