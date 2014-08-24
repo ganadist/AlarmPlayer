@@ -5,6 +5,7 @@ c = {
   'timetable_url': 'http://javaoracle.cafe24.com/api.php',
   'sound_url': 'http://javaoracle.cafe24.com/playlist.php',
   'time': '041000',
+  'time_interval': 30 * 60 * 1000,
   'cachedir': 'cache'
 }
 

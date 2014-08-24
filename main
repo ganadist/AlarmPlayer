@@ -83,18 +83,23 @@ class FetcherService:
         self.filename = os.path.join(config.CACHE_DIR, filename)
         self.url = url
         self.fetcher = Fetcher(url, self.filename)
-        self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
-
+        self.schedule()
         if 1 or not os.access(self.filename, os.R_OK):
             self.fetch()
         else:
             self.parse()
 
+    def schedule(self):
+        if config.FETCH_INTERVAL:
+            self.tag = Timer(config.FETCH_INTERVAL, self.fetch)
+        else:
+            self.tag = DailyScheduler(config.FETCH_TIME, self.fetch)
+
     def fetch(self):
         self.fetcher.run(self.fetch_completed)
 
     def retry(self):
-        self.schedule = Timer(self.RETRY_DELAY, self.fetch)
+        self.tag = Timer(self.RETRY_DELAY, self.fetch)
 
     def clock_changed(self):
         if not os.access(self.filename, os.R_OK):
@@ -116,7 +121,7 @@ class FetcherService:
             print 'parse error', e
             self.retry()
         else:
-            self.schedule = DailyScheduler(config.FETCH_TIME, self.fetch)
+            self.schedule()
 
     def parse(self):
         raise NotImplementedError
