@@ -14,8 +14,9 @@ DEFAULT_ALARM = ''
 def load():
     global TIMETABLE_URL, SOUND_URL, FETCH_TIME, CACHE_DIR
     config = json.load(open(CONFIG_FILE))
-    TIMETABLE_URL = str(config.get('timetable_url'))
-    SOUND_URL = str(config.get('sound_url'))
+    UUID = open('/sys/class/net/eth0/address').readline().strip().replace(':', '')
+    TIMETABLE_URL = str(config.get('timetable_url')) + '?uuid=' + UUID
+    SOUND_URL = str(config.get('sound_url')) + '?uuid=' + UUID
     FETCH_TIME = hms2time(config.get('time'))
     CACHE_DIR = str(config.get('cachedir'))
     try:
