@@ -1,0 +1,24 @@
+#!/bin/sh
+SERVICE=chime-player.service
+
+case $1 in
+  start)
+    systemctl start $SERVICE
+    ;;
+  stop)
+    systemctl stop $SERVICE
+    ;;
+  restart)
+    systemctl stop $SERVICE
+    systemctl start $SERVICE
+    ;;
+  status)
+    systemctl status $SERVICE
+    ;;
+  log)
+    systemd-journalctl -a -f -n 50 _SYSTEMD_UNIT=$SERVICE
+    ;;
+  *)
+    echo $0 [start|stop|restart|status|log]
+    ;;
+esac
