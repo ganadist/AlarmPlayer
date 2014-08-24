@@ -8,6 +8,8 @@ import time
 from lib import *
 import config
 
+Log = Logger('main')
+
 class AlarmPlayer:
     def __init__(self, filename):
         self.filename = filename
@@ -23,19 +25,35 @@ class TimeSyncManager:
     def __init__(self, cb, *args):
         self.time = time.time()
         self.tag = Timer(10 * 1000, self.check_time)
+        self.proc = None
         self.cb = cb
         self.cb_args = args
 
     def check_time(self):
         ctime = time.time()
         if abs(self.time - ctime) > 20:
-            print 'clock was changed, run time sync callback'
+            Log.i('clock was changed, run time sync callback')
             try:
               self.cb(*self.cb_args)
             except:
               pass
         self.time = ctime
-        return True
+        self.tag = Timer(10 * 1000, self.check_time)
+
+    def sync(self):
+        if self.proc:
+            Log.w('time sync is proceeding, ignore.')
+            return
+        cmd = ('sudo', '/usr/sbin/ntpdate-debian')
+        self.proc = Spawn(cmd, self.watch)
+
+    def watch(self, pid, status):
+        self.proc = None
+        if status == 0:
+            self.check_time()
+            return
+        Log.e('ntpdate failed. reschedule time sync')
+        self.sync_tag = Timer(10 * 1000, self.sync)
 
 class DownloadManager:
     def __init__(self):
@@ -105,20 +123,20 @@ class FetcherService:
         if not os.access(self.filename, os.R_OK):
             if not self.fetcher.is_running():
                 self.retry()
-            print '%s is not fetched yet.'%self.filename
+            Log.w('%s is not fetched yet.'%self.filename)
             return
         self.parse()
 
     def fetch_completed(self, success, fetcher):
         if not success:
-            print 'fetch %s failed'%self.filename
+            Log.e('fetch %s failed'%self.filename)
             self.retry()
             return
 
         try:
             self.parse()
         except Exception as e:
-            print 'parse error', e
+            Log.e('parse error: %s'%e)
             self.retry()
         else:
             self.schedule()
@@ -131,19 +149,26 @@ def get_filename(key):
     return os.path.join(config.CACHE_DIR, outname)
 
 class TimetableFetcherService(FetcherService):
-    def __init__(self):
+    def __init__(self, syncmgr):
         FetcherService.__init__(self, config.TIMETABLE_URL, 'timetable.json') 
+        self.syncmgr = syncmgr
 
     def parse(self):
         timetable = json.load(open(self.filename))
+        server_time = timetable.get('timestamp')
+        diff = server_time - time.time()
+        Log.i("timestamp diff = %d with server"%diff)
+        if abs(diff) > 30:
+            self.syncmgr.sync()
+            return
 
         schedule_alarm = []
         for item in timetable.get('timetable'):
-            time = hms2time(item.get('time'))
+            hms = hms2time(item.get('time'))
             outname = get_filename(item.get('sound_no'))
             weekday = int(item.get('weekday'))
             alarm = AlarmPlayer(outname)
-            schedule_alarm.append(WeeklyScheduler(weekday, time, alarm.run))
+            schedule_alarm.append(WeeklyScheduler(weekday, hms, alarm.run))
 
         self.schedule_alarm = schedule_alarm
 
@@ -166,9 +191,9 @@ class SoundlistFetcherService(FetcherService):
  
 class ScheduleFetcher:
     def __init__(self):
-        self.timetable = TimetableFetcherService()
-        self.soundlist = SoundlistFetcherService()
         self.timesync = TimeSyncManager(self.reschedule)
+        self.timetable = TimetableFetcherService(self.timesync)
+        self.soundlist = SoundlistFetcherService()
 
     def reschedule(self):
         self.timetable.clock_changed()
@@ -179,7 +204,7 @@ def load_config():
 
 if __name__ == '__main__':
     pwd = os.path.dirname(sys.argv[0]) or '.'
-    print 'change pwd to', pwd
+    Log.i('change pwd to %s'%pwd)
     os.chdir(pwd)
     load_config()
     f = ScheduleFetcher()
