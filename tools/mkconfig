@@ -2,7 +2,7 @@
 import json
 
 c = {
-  'timetable_url': 'http://javaoracle.cafe24.com/timetable.php',
+  'timetable_url': 'http://javaoracle.cafe24.com/api.php',
   'sound_url': 'http://javaoracle.cafe24.com/playlist.php',
   'time': '041000',
   'cachedir': 'cache'
