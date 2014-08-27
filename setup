@@ -54,7 +54,9 @@ EOF
   ln -sf /usr/sbin/ntpdate-debian /etc/cron.daily/
 
   INIT_D_ENABLE=""
-  INIT_D_DISABLE="lightdm xrdp" #avahi-daemon
+  INIT_D_DISABLE="apache2 lightdm xrdp" #avahi-daemon
+
+  SD_DISABLE="bonescript-autorun.service"
 
   for S in $INIT_D_ENABLE
   do
@@ -68,6 +70,13 @@ EOF
    echo "disable $S"
    update-rc.d -f "$S" remove
    /etc/init.d/$S stop
+  done
+
+  for S in $SD_DISABLE
+  do
+   echo "disable $S"
+   systemctl disable $S
+   systemctl stop $S
   done
 }
 
