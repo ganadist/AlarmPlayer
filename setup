@@ -71,7 +71,21 @@ EOF
   done
 }
 
+print_help() {
+  UUID=$(cat /sys/class/net/eth0/address |tr -d ":")
+  echo ""
+  echo ""
+  echo "If you want to control service, use this command"
+  echo "$PWD/$REPO_NAME/tools/ctl"
+  echo ""
+  echo "UUID is $UUID"
+  echo ""
+}
+
+
 install_service
 prepare_service
 
 systemctl start ${SERVICE_NAME}
+
+print_help
