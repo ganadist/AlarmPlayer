@@ -21,6 +21,7 @@ install_service() {
 Description=Daemon for Chime Service
 
 [Service]
+Environment="AUDIODEV=hw:Set"
 ExecStart=${PWD}/${REPO_NAME}/main
 Restart=always
 RestartSec=2
